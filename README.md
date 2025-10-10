@@ -2,10 +2,10 @@
 
 # Memos Worker: A Cloudflare-Powered Notes and Knowledge Base
 
-<img width="1920" height="894" alt="image" src="https://github.com/user-attachments/assets/418b1034-60bd-44ab-a57b-9aceca6ae099" />
-<img width="1920" height="894" alt="image" src="https://github.com/user-attachments/assets/525cc0d1-3d08-4d6b-8def-c4e44602b7e9" />
-<img width="1920" height="894" alt="image" src="https://github.com/user-attachments/assets/2c341c9e-80a3-450c-8dbc-107f80d14f60" />
-<img width="1920" height="894" alt="image" src="https://github.com/user-attachments/assets/3c965f5a-34dd-4efc-8c0c-d57859f1fbc8" />
+![1](./image/1.png)
+![1](./image/2.png)
+![1](./image/3.png)
+![1](./image/4.png)
 
 **Memos Worker** is a powerful and high-performance serverless application for notes and knowledge management. Built entirely on the Cloudflare ecosystem (Workers, Pages, D1, R2, KV), it provides a private, cost-effective notes solution that you can own forever.
 
