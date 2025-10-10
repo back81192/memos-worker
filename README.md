@@ -63,7 +63,7 @@ After deployment, go to your new Worker's settings to add secrets.
 2.  Under **Environment Variables**, add the following variables. Remember to click `Encrypt` for sensitive values.
 
 	| Variable Name           | Description                                  |
-	    | ----------------------- | -------------------------------------------- |
+    | ----------------------- | -------------------------------------------- |
 	| `USERNAME`              | Your login username                          |
 	| `PASSWORD`              | Your login password                          |
 	| `TELEGRAM_BOT_TOKEN`    | (Optional) Your Telegram bot's token         |
