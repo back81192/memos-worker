@@ -109,6 +109,11 @@
   body[data-theme='dark'] .attachment-link:hover {
 	background-color: #2d3748;
   }
+  body[data-theme='dark'] #share-link-modal-box input[type="text"] {
+	background-color: var(--surface-input-bg, #2d3748);
+	color: var(--text-color);
+	border-color: var(--border-color);
+  }
   body:not(.auth-visible) #app-container {
 	display: block;
   }
@@ -3232,6 +3237,9 @@
 	<button class='icon-btn' data-action='archive' title='Archive'>
 		<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L8 13.5l1.41-1.41L11 13.67V10h2v3.67l1.59-1.58L16 13.5l-4 4zM5.12 5l.83-1h12.1l.83 1H5.12z"/></svg>
 	</button>
+	<button class='icon-btn' data-action='share' title='Share'>
+		<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/></svg>
+	</button>
 	<button class='icon-btn btn-danger' data-action='delete' title='Delete Note'>
 		<svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='currentColor'>
 			<path d='M0 0h24v24H0V0z' fill='none' />
@@ -3384,6 +3392,31 @@
 				</div>
 			</div>
 
+
+			<div class='setting-group'>
+				<h4>Feature Visibility</h4>
+				<div class='setting-item'>
+					<label for='toggle-feature-favorites'>Show Favorites</label>
+					<input type='checkbox' id='toggle-feature-favorites' class='toggle-switch'>
+				</div>
+				<div class='setting-item'>
+					<label for='toggle-feature-archive'>Show Archive</label>
+					<input type='checkbox' id='toggle-feature-archive' class='toggle-switch'>
+				</div>
+				<div class='setting-item'>
+					<label for='toggle-feature-pinning'>Enable Pinning</label>
+					<input type='checkbox' id='toggle-feature-pinning' class='toggle-switch'>
+				</div>
+				<div class='setting-item'>
+					<label for='toggle-feature-sharing'>Enable Sharing</label>
+					<input type='checkbox' id='toggle-feature-sharing' class='toggle-switch'>
+				</div>
+				<div class='setting-item'>
+					<label for='toggle-feature-docs'>Show Docs Link</label>
+					<input type='checkbox' id='toggle-feature-docs' class='toggle-switch'>
+				</div>
+			</div>
+
 			<div class='setting-group'>
 				<h4>Background</h4>
 				<div class='setting-item'>
@@ -3499,6 +3532,56 @@
 
 <div id='heatmap-tooltip'></div>
 <div id='calendar-tooltip'></div>
+
+<!-- Share Link Modal -->
+<div id='share-link-modal-overlay' class='custom-modal-overlay'>
+	<div id='share-link-modal-box' class='custom-modal-box' style="max-width: 600px; text-align: left;">
+		<h3 style="margin-top:0;">Share Memo</h3>
+		<div id="share-link-content">
+			<!-- 加载状态 -->
+			<div id="share-link-loader" style="text-align: center; padding: 2rem 0;">
+				<div class="spinner"></div>
+				<p>Generating link...</p>
+			</div>
+			<!-- 链接内容 -->
+			<div id="share-link-details" style="display: none;">
+				<p>Anyone with these public links can view this memo.</p>
+				<div class="share-link-item" style="margin-bottom: 1rem;">
+					<label style="font-weight: 500;">Display Link</label>
+					<div style="display: flex; gap: 0.5rem;">
+						<input type="text" id="share-display-link-input" readonly style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--bg-color);">
+						<button id="copy-display-link-btn" class="btn">Copy</button>
+					</div>
+				</div>
+				<div class="share-link-item" style="margin-bottom: 1.5rem;">
+					<label style="font-weight: 500;">Raw Content Link</label>
+					<div style="display: flex; gap: 0.5rem;">
+						<input type="text" id="share-raw-link-input" readonly style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--bg-color);">
+						<button id="copy-raw-link-btn" class="btn">Copy</button>
+					</div>
+				</div>
+
+				<div class="share-link-item" style="display: flex; align-items: center; gap: 1rem;">
+					<label for="expiration-select" style="font-weight: 500; flex-shrink: 0;">Expires in:</label>
+					<select id="expiration-select" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--bg-color); color: var(--text-color);">
+						<option value="3600">1 Hour</option>
+						<option value="14400">4 Hour</option>
+						<option value="43200">12 Hours</option>
+						<option value="86400">1 Day</option>
+						<option value="604800">7 Days</option>
+						<option value="0">Never</option>
+						<option disabled>──────────</option>
+						<option value="revoke">Revoke Now (Expire Immediately)</option>
+					</select>
+					<span id="expiration-status" style="font-size: 0.8rem; color: var(--text-secondary); width: 80px; text-align: right;"></span>
+				</div>
+			</div>
+		</div>
+		<div class='custom-modal-actions' style="justify-content: flex-end;">
+			<button id='share-link-close-btn' class='btn btn-secondary'>Close</button>
+		</div>
+	</div>
+</div>
 
 <!--	<script src="/script.js" defer></script>-->
 </body>
@@ -3897,7 +3980,12 @@
 		showHeatmap: true, imageUploadDestination: 'local', imgurClientId: '',
 		surfaceColor: '#ffffff', surfaceColorDark: '#151f31', surfaceOpacity: 1,
 		backgroundOpacity: 1, backgroundImage: '/bg.jpg', backgroundBlur: 0,
-		waterfallCardWidth: 320, enableDateGrouping: false, telegramProxy: false
+		waterfallCardWidth: 320, enableDateGrouping: false, telegramProxy: false,
+		showFavorites: true,  // 控制收藏夹
+		showArchive: true,      // 控制归档
+		enablePinning: true,    // 控制置顶功能
+		enableSharing: true,    // 控制分享功能
+		showDocs: true          // 控制 Docs 链接
 	}
 	let settings = defaultSettings;
 
@@ -4077,40 +4165,157 @@
 	let waterfallPopoverHideTimer = null;
 	let activePopoverNoteId = null;
 
+	const shareModal = document.getElementById('share-link-modal-overlay');
+	const closeShareModalBtn = document.getElementById('share-link-close-btn');
+	const copyDisplayLinkBtn = document.getElementById('copy-display-link-btn');
+	const copyRawLinkBtn = document.getElementById('copy-raw-link-btn');
+
+	const expirationSelect = document.getElementById('expiration-select');
+	const expirationStatus = document.getElementById('expiration-status');
+	let currentPublicId = null;
+
+	expirationSelect.addEventListener('change', async () => {
+		const shareModal = document.getElementById('share-link-modal-overlay');
+		const noteId = shareModal.dataset.noteId;
+		const selectedValue = expirationSelect.value;
+
+		if (selectedValue === 'revoke') {
+			const confirmed = await showCustomConfirm('Are you sure you want to revoke the public links immediately? This action cannot be undone.');
+			if (confirmed) {
+				expirationStatus.textContent = 'Revoking...';
+				expirationSelect.disabled = true;
+				try {
+					const response = await fetch(`/api/notes/${noteId}/share`, { method: 'DELETE' });
+					if (!response.ok) {
+						const err = await response.json();
+						throw new Error(err.error || 'Failed to revoke share link.');
+					}
+					closeShareModal();
+					showCustomAlert('Sharing has been successfully revoked.', 'info');
+				} catch (error) {
+					showCustomAlert(`Error: ${error.message}`, 'error');
+					expirationStatus.textContent = 'Error!';
+				} finally {
+					expirationSelect.disabled = false;
+				}
+			} else {
+				expirationSelect.value = "3600";
+			}
+			return;
+		}
+		const newExpirationTtl = parseInt(expirationSelect.value, 10);
+
+		if (!noteId || !currentPublicId) return;
+
+		expirationStatus.textContent = 'Updating...';
+		expirationSelect.disabled = true;
+
+		try {
+			const response = await fetch(`/api/notes/${noteId}/share`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					publicId: currentPublicId,
+					expirationTtl: newExpirationTtl
+				})
+			});
+
+			if (!response.ok) {
+				const err = await response.json();
+				throw new Error(err.error || 'Failed to update expiration.');
+			}
+
+			expirationStatus.textContent = 'Updated!';
+			setTimeout(() => {
+				expirationStatus.textContent = '';
+			}, 2000);
+
+		} catch (error) {
+			expirationStatus.textContent = 'Error!';
+			showCustomAlert(`Error: ${error.message}`, 'error');
+		} finally {
+			expirationSelect.disabled = false;
+		}
+	});
+
+	function closeShareModal() {
+		const shareModal = document.getElementById('share-link-modal-overlay');
+		shareModal.classList.remove('visible');
+		shareModal.querySelector('.custom-modal-box').classList.remove('active');
+		delete shareModal.dataset.noteId;
+		currentPublicId = null;
+	}
+
+	closeShareModalBtn.addEventListener('click', closeShareModal);
+	shareModal.addEventListener('click', (e) => {
+		if (e.target === shareModal) {
+			closeShareModal();
+		}
+	});
+
+	async function copyLink(inputElement, buttonElement) {
+		try {
+			await navigator.clipboard.writeText(inputElement.value);
+			const originalText = buttonElement.textContent;
+			buttonElement.textContent = 'Copied!';
+			setTimeout(() => {
+				buttonElement.textContent = originalText;
+			}, 2000);
+		} catch (err) {
+			console.error('Failed to copy text: ', err);
+			showCustomAlert('Failed to copy link.', 'error');
+		}
+	}
+
+	copyDisplayLinkBtn.addEventListener('click', () => copyLink(document.getElementById('share-display-link-input'), copyDisplayLinkBtn));
+	copyRawLinkBtn.addEventListener('click', () => copyLink(document.getElementById('share-raw-link-input'), copyRawLinkBtn));
 	// --- 显示笔记操作菜单 ---
 	function showNotePopover(targetButton, noteId) {
-		clearTimeout(popoverHoverTimer); // 清除可能存在的隐藏计时器
-		// 如果菜单已经为同一个按钮显示，则不执行任何操作
+		clearTimeout(popoverHoverTimer);
 		if (notePopoverMenu.classList.contains('visible') && activePopoverNoteId === noteId) {
 			return;
 		}
 		activePopoverNoteId = noteId;
 		notePopoverMenu.dataset.noteId = noteId;
+
 		const noteData = allNotesCache.find(n => n.id === parseInt(noteId, 10));
 		const favoriteBtn = notePopoverMenu.querySelector('[data-action="favorite"]');
 		const pinBtn = notePopoverMenu.querySelector('[data-action="pin"]');
 		const archiveBtn = notePopoverMenu.querySelector('[data-action="archive"], [data-action="unarchive"]');
+		const shareBtn = notePopoverMenu.querySelector('[data-action="share"]');
 
+		shareBtn.style.display = settings.enableSharing ? '' : 'none';
 		if (appState.baseMode === 'archive') {
+			// 在归档视图下，只可能显示 "Unarchive"
+			archiveBtn.style.display = settings.showArchive ? '' : 'none'; // 同样要尊重设置
 			archiveBtn.classList.add('unarchive-mode');
 			archiveBtn.title = 'Unarchive';
 			archiveBtn.dataset.action = 'unarchive';
+
+			// 强制隐藏其他不相关的按钮
 			favoriteBtn.style.display = 'none';
 			pinBtn.style.display = 'none';
 		} else {
+			// 在常规视图下（Home, Favorites）
+			archiveBtn.style.display = settings.showArchive ? '' : 'none';
 			archiveBtn.classList.remove('unarchive-mode');
 			archiveBtn.title = 'Archive';
 			archiveBtn.dataset.action = 'archive';
-			favoriteBtn.style.display = '';
-			pinBtn.style.display = '';
 
-			const noteData = allNotesCache.find(n => n.id === parseInt(noteId, 10));
+			// 只有在设置开启时，才显示收藏和置顶按钮
+			favoriteBtn.style.display = settings.showFavorites ? '' : 'none';
+			pinBtn.style.display = settings.enablePinning ? '' : 'none';
+
+			// 如果按钮是可见的，再更新它们的激活状态 (是否已收藏/已置顶)
 			if (noteData) {
-				favoriteBtn.classList.toggle('favorited', noteData.is_favorited);
-				favoriteBtn.title = noteData.is_favorited ? 'Unfavorite' : 'Favorite';
-
-				pinBtn.classList.toggle('pinned', noteData.is_pinned);
-				pinBtn.title = noteData.is_pinned ? 'Unpin' : 'Pin';
+				if (settings.showFavorites) {
+					favoriteBtn.classList.toggle('favorited', noteData.is_favorited);
+					favoriteBtn.title = noteData.is_favorited ? 'Unfavorite' : 'Favorite';
+				}
+				if (settings.enablePinning) {
+					pinBtn.classList.toggle('pinned', noteData.is_pinned);
+					pinBtn.title = noteData.is_pinned ? 'Unpin' : 'Pin';
+				}
 			}
 		}
 
@@ -4218,6 +4423,44 @@
 					showCustomAlert(error.message, 'error');
 				} finally {
 					actionButton.disabled = false;
+				}
+				break;
+			}
+			case 'share': {
+				const shareModal = document.getElementById('share-link-modal-overlay');
+				const loader = document.getElementById('share-link-loader');
+				const details = document.getElementById('share-link-details');
+
+				shareModal.dataset.noteId = noteId;
+
+				shareModal.classList.add('visible');
+				shareModal.querySelector('.custom-modal-box').classList.add('active');
+				loader.style.display = 'block';
+				details.style.display = 'none';
+
+				// 将下拉框重置为默认值
+				expirationSelect.value = "3600";
+				expirationStatus.textContent = '';
+
+				try {
+					// 初始创建，使用默认过期时间
+					const response = await fetch(`/api/notes/${noteId}/share`, { method: 'POST' });
+					if (!response.ok) {
+						const err = await response.json();
+						throw new Error(err.error || 'Failed to generate share link.');
+					}
+					const data = await response.json();
+
+					currentPublicId = data.publicId; // 存储 publicId
+
+					document.getElementById('share-display-link-input').value = data.displayUrl;
+					document.getElementById('share-raw-link-input').value = data.rawUrl;
+					loader.style.display = 'none';
+					details.style.display = 'block';
+
+				} catch (error) {
+					showCustomAlert(`Error: ${error.message}`, 'error');
+					closeShareModal();
 				}
 				break;
 			}
@@ -4966,6 +5209,21 @@
 	}
 
 	/**
+	 * 根据设置，应用特性相关 UI 元素的可见性 (主要针对静态元素)
+	 */
+	function applyFeatureVisibilitySettings() {
+		if (!settings) return;
+
+		// 控制右侧边栏的按钮
+		document.getElementById('favorites-tab-btn').style.display = settings.showFavorites ? '' : 'none';
+		document.getElementById('archive-tab-btn').style.display = settings.showArchive ? '' : 'none';
+
+		const docsLink = document.querySelector('.sidebar-buttons-group a[href="/docs"]');
+		if (docsLink) {
+			docsLink.style.display = settings.showDocs ? '' : 'none';
+		}
+	}
+	/**
 	 * 根据当前加载的设置，应用所有UI效果
 	 */
 	async function applySettings() {
@@ -5079,9 +5337,32 @@
 		waterfallWidthValue.textContent = `${settings.waterfallCardWidth}px`;
 		toggleDateGrouping.checked = settings.enableDateGrouping;
 		toggleTelegramProxy.checked = settings.telegramProxy;
+		document.getElementById('toggle-feature-favorites').checked = settings.showFavorites;
+		document.getElementById('toggle-feature-archive').checked = settings.showArchive;
+		document.getElementById('toggle-feature-pinning').checked = settings.enablePinning;
+		document.getElementById('toggle-feature-sharing').checked = settings.enableSharing;
+		document.getElementById('toggle-feature-docs').checked = settings.showDocs;
 	}
 
 	function initializeSettings() {
+		document.getElementById('toggle-feature-favorites').addEventListener('change', (e) => {
+			settings.showFavorites = e.target.checked;
+			applyFeatureVisibilitySettings();
+		});
+		document.getElementById('toggle-feature-archive').addEventListener('change', (e) => {
+			settings.showArchive = e.target.checked;
+			applyFeatureVisibilitySettings();
+		});
+		document.getElementById('toggle-feature-pinning').addEventListener('change', (e) => {
+			settings.enablePinning = e.target.checked;
+		});
+		document.getElementById('toggle-feature-sharing').addEventListener('change', (e) => {
+			settings.enableSharing = e.target.checked;
+		});
+		document.getElementById('toggle-feature-docs').addEventListener('change', (e) => {
+			settings.showDocs = e.target.checked;
+			applyFeatureVisibilitySettings();
+		});
 		surfaceOpacitySlider.addEventListener('input', (e) => {
 			settings.surfaceOpacity = e.target.value
 			applySettings();
