@@ -102,10 +102,7 @@ If you configured the Telegram variables, you need to activate the webhook once.
 > Alternatively, you can deploy directly from the command line using Wrangler. (This guide is based on `wrangler@^4.33.0`).
 >
 > 1.  Clone the repository locally and fill in the `wrangler.toml` file with your configurations for KV, D1, and R2.
-> 2.  Run the command:
-	  > 	```bash
-	  > 	npx wrangler deploy
-	  > 	```
+> 2.  Run the command: `npx wrangler deploy`
 
 ## 💡 Tips
 
