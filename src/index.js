@@ -69,6 +69,10 @@ async function handleApiRequest(request, env) {
 		return jsonResponse({ error: 'Unauthorized' }, 401);
 	}
 
+	if (request.method === 'POST' && pathname === '/api/notes/merge') {
+		return handleMergeNotes(request, env);
+	}
+
 	const shareNoteMatch = pathname.match(/^\/api\/notes\/(\d+)\/share$/);
 	if (shareNoteMatch) {
 		const [, noteId] = shareNoteMatch;
@@ -650,6 +654,20 @@ async function handleNoteDetail(request, noteId, env) {
 						currentFiles = currentFiles.filter(file => !filesToDelete.includes(file.id));
 					}
 
+					// 在处理完文件删除后，检查笔记是否应该被删除
+					const hasNewFiles = formData.getAll('file').some(f => f.name && f.size > 0);
+					if (content.trim() === '' && currentFiles.length === 0 && !hasNewFiles) {
+						// 笔记即将变空，执行删除操作
+						// 1. 删除 R2 中的所有剩余文件（如果有的话，虽然逻辑上这里 currentFiles 应该是空的）
+						const allR2Keys = existingNote.files.map(file => `${id}/${file.id}`);
+						if (allR2Keys.length > 0) {
+							await env.NOTES_R2_BUCKET.delete(allR2Keys);
+						}
+						// 2. 从数据库删除笔记
+						await db.prepare("DELETE FROM notes WHERE id = ?").bind(id).run();
+						// 3. 返回特殊标记，告知前端整个笔记已被删除
+						return jsonResponse({ success: true, noteDeleted: true });
+					}
 					// 处理新附件上传
 					const newFiles = formData.getAll('file');
 					for (const file of newFiles) {
@@ -1895,6 +1913,89 @@ async function handlePublicRawNoteRequest(publicId, env) {
 	} catch (e) {
 		console.error(`Public Raw Note Error (publicId: ${publicId}):`, e.message);
 		return new Response('Server Error', { status: 500 });
+	}
+}
+
+/**
+ * 处理笔记合并请求
+ * POST /api/notes/merge
+ * Body: { sourceNoteId: number, targetNoteId: number, addSeparator: boolean }
+ */
+async function handleMergeNotes(request, env) {
+	const db = env.DB;
+	try {
+		const { sourceNoteId, targetNoteId, addSeparator } = await request.json();
+
+		if (!sourceNoteId || !targetNoteId || sourceNoteId === targetNoteId) {
+			return jsonResponse({ error: 'Invalid source or target note ID.' }, 400);
+		}
+
+		const [noteA, noteB] = await Promise.all([
+			db.prepare("SELECT * FROM notes WHERE id = ?").bind(sourceNoteId).first(),
+			db.prepare("SELECT * FROM notes WHERE id = ?").bind(targetNoteId).first(),
+		]);
+
+		if (!noteA || !noteB) {
+			return jsonResponse({ error: 'One or both notes not found.' }, 404);
+		}
+
+		// --- 核心逻辑：根据时间戳确定新旧笔记 ---
+		let newerNote, olderNote;
+		if (noteA.updated_at >= noteB.updated_at) {
+			newerNote = noteA;
+			olderNote = noteB;
+		} else {
+			newerNote = noteB;
+			olderNote = noteA;
+		}
+
+		// 1. 合并内容：新笔记在前，旧笔记在后
+		// 根据前端传来的 addSeparator 参数决定是否添加分割线
+		const separator = addSeparator ? '\n\n---\n\n' : '\n\n'; // 如果不加，也保留两个换行符
+		const mergedContent = newerNote.content + separator + olderNote.content;
+
+		// 2. 合并文件
+		const newerFiles = JSON.parse(newerNote.files || '[]');
+		const olderFiles = JSON.parse(olderNote.files || '[]');
+		const mergedFiles = JSON.stringify([...newerFiles, ...olderFiles]);
+
+		// 3. 时间戳：取两个笔记中较老的一个
+		const mergedTimestamp = Math.min(noteA.updated_at, noteB.updated_at);
+
+		// --- 数据库与 R2 操作 ---
+
+		const stmt = db.prepare(
+			"UPDATE notes SET content = ?, files = ?, updated_at = ? WHERE id = ?"
+		);
+		await stmt.bind(mergedContent, mergedFiles, mergedTimestamp, newerNote.id).run();
+
+		await processNoteTags(db, newerNote.id, mergedContent);
+
+		await db.prepare("DELETE FROM notes WHERE id = ?").bind(olderNote.id).run();
+
+		if (olderFiles.length > 0) {
+			const r2 = env.NOTES_R2_BUCKET;
+			for (const file of olderFiles) {
+				const oldKey = `${olderNote.id}/${file.id}`;
+				const newKey = `${newerNote.id}/${file.id}`;
+				const object = await r2.get(oldKey);
+				if (object) {
+					await r2.put(newKey, object.body);
+					await r2.delete(oldKey);
+				}
+			}
+		}
+
+		const updatedMergedNote = await db.prepare("SELECT * FROM notes WHERE id = ?").bind(newerNote.id).first();
+		if (typeof updatedMergedNote.files === 'string') {
+			updatedMergedNote.files = JSON.parse(updatedMergedNote.files);
+		}
+
+		return jsonResponse(updatedMergedNote);
+
+	} catch (e) {
+		console.error("Merge Notes Error:", e.message, e.cause);
+		return jsonResponse({ error: 'Database or R2 error during merge', message: e.message }, 500);
 	}
 }
 
