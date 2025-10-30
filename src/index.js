@@ -12,6 +12,32 @@ export default {
  */
 async function handleApiRequest(request, env) {
 	const { pathname } = new URL(request.url);
+
+	// --- Memos 分享公开路由 ---
+	// 匹配分享页面 /share/some-uuid
+	const sharePageMatch = pathname.match(/^\/share\/([a-zA-Z0-9-]+)$/);
+	if (sharePageMatch) {
+		const publicId = sharePageMatch[1];
+		// 构建目标 URL，将 publicId 作为查询参数
+		const targetUrl = new URL('/share.html', request.url);
+		targetUrl.searchParams.set('id', publicId);
+		// 返回一个 302 临时重定向响应
+		return Response.redirect(targetUrl.toString(), 302);
+	}
+	// 匹配获取分享内容的公开 API /api/public/note/some-uuid
+	const publicNoteMatch = pathname.match(/^\/api\/public\/note\/([a-zA-Z0-9-]+)$/);
+	if (publicNoteMatch && request.method === 'GET') {
+		const publicId = publicNoteMatch[1];
+		return handlePublicNoteRequest(publicId, env);
+	}
+	// 匹配获取分享 Raw 内容的公开 API /api/public/note/raw/some-uuid
+	const publicRawNoteMatch = pathname.match(/^\/api\/public\/note\/raw\/([a-zA-Z0-9-]+)$/);
+	if (publicRawNoteMatch && request.method === 'GET') {
+		const publicId = publicRawNoteMatch[1];
+		return handlePublicRawNoteRequest(publicId, env);
+	}
+	// --- Memos 分享公开路由 ---
+
 	// 公开文件访问路由 (必须在身份验证之前)
 	const publicFileMatch = pathname.match(/^\/api\/public\/file\/([a-zA-Z0-9-]+)$/);
 	if (publicFileMatch) {
@@ -41,6 +67,21 @@ async function handleApiRequest(request, env) {
 	const session = await isSessionAuthenticated(request, env);
 	if (!session) {
 		return jsonResponse({ error: 'Unauthorized' }, 401);
+	}
+
+	if (request.method === 'POST' && pathname === '/api/notes/merge') {
+		return handleMergeNotes(request, env);
+	}
+
+	const shareNoteMatch = pathname.match(/^\/api\/notes\/(\d+)\/share$/);
+	if (shareNoteMatch) {
+		const [, noteId] = shareNoteMatch;
+		if (request.method === 'POST') {
+			return handleShareNoteRequest(noteId, request, env);
+		}
+		if (request.method === 'DELETE') {
+			return handleUnshareNoteRequest(noteId, env);
+		}
 	}
 
 	const shareFileMatch = pathname.match(/^\/api\/notes\/(\d+)\/files\/([a-zA-Z0-9-]+)\/share$/);
@@ -401,7 +442,12 @@ async function handleGetSettings(request, env) {
 		backgroundBlur: 0,
 		waterfallCardWidth: 320,
 		enableDateGrouping: false,
-		telegramProxy: false
+		telegramProxy: false,
+		showFavorites: true,  // 控制收藏夹
+		showArchive: true,      // 控制归档
+		enablePinning: true,    // 控制置顶功能
+		enableSharing: true,    // 控制分享功能
+		showDocs: true          // 控制 Docs 链接
 	};
 
 	let savedSettings = await env.NOTES_KV.get('user_settings', 'json');
@@ -608,6 +654,20 @@ async function handleNoteDetail(request, noteId, env) {
 						currentFiles = currentFiles.filter(file => !filesToDelete.includes(file.id));
 					}
 
+					// 在处理完文件删除后，检查笔记是否应该被删除
+					const hasNewFiles = formData.getAll('file').some(f => f.name && f.size > 0);
+					if (content.trim() === '' && currentFiles.length === 0 && !hasNewFiles) {
+						// 笔记即将变空，执行删除操作
+						// 1. 删除 R2 中的所有剩余文件（如果有的话，虽然逻辑上这里 currentFiles 应该是空的）
+						const allR2Keys = existingNote.files.map(file => `${id}/${file.id}`);
+						if (allR2Keys.length > 0) {
+							await env.NOTES_R2_BUCKET.delete(allR2Keys);
+						}
+						// 2. 从数据库删除笔记
+						await db.prepare("DELETE FROM notes WHERE id = ?").bind(id).run();
+						// 3. 返回特殊标记，告知前端整个笔记已被删除
+						return jsonResponse({ success: true, noteDeleted: true });
+					}
 					// 处理新附件上传
 					const newFiles = formData.getAll('file');
 					for (const file of newFiles) {
@@ -1605,15 +1665,32 @@ async function handleShareFileRequest(noteId, fileId, request, env) {
 /**
  * 处理对公开文件链接的访问请求，无需身份验证。
  * GET /api/public/file/:publicId
+ * 现在能同时处理笔记附件和独立上传的图片。
  */
 async function handlePublicFileRequest(publicId, request, env) {
 	const kvData = await env.NOTES_KV.get(`public_file:${publicId}`, 'json');
 	if (!kvData) {
 		return new Response('Public link not found or has expired.', { status: 404 });
 	}
-	const { noteId, fileId, fileName, contentType } = kvData;
 
-	const object = await env.NOTES_R2_BUCKET.get(`${noteId}/${fileId}`);
+	let object;
+	let fileName;
+	let contentType;
+
+	if (kvData.standaloneImageId) {
+		// 1. 是独立上传的图片
+		object = await env.NOTES_R2_BUCKET.get(`uploads/${kvData.standaloneImageId}`);
+		fileName = kvData.fileName || `image_${kvData.standaloneImageId}.png`;
+		contentType = kvData.contentType || 'image/png';
+	} else if (kvData.noteId && kvData.fileId) {
+		// 2. 是笔记的附件
+		object = await env.NOTES_R2_BUCKET.get(`${kvData.noteId}/${kvData.fileId}`);
+		fileName = kvData.fileName;
+		contentType = kvData.contentType;
+	} else {
+		return new Response('Invalid public link data.', { status: 500 });
+	}
+
 	if (object === null) {
 		return new Response('File not found in storage', { status: 404 });
 	}
@@ -1621,11 +1698,9 @@ async function handlePublicFileRequest(publicId, request, env) {
 	const headers = new Headers();
 	object.writeHttpMetadata(headers);
 	headers.set('etag', object.httpEtag);
-	headers.set('Cache-Control', 'public, max-age=86400, immutable'); // 缓存24小时
+	headers.set('Cache-Control', 'public, max-age=86400, immutable');
 
-	// 始终以内联方式提供（raw content），而不是作为附件下载
 	headers.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`);
-	// 确保文本文件以 text/plain 形式提供，防止浏览器执行代码
 	const textLikeExtensions = ['txt', 'md', 'log', 'json', 'js', 'css', 'html', 'xml', 'yaml', 'yml', 'py', 'sh', 'rb', 'go', 'java', 'c', 'cpp'];
 	if ((contentType || '').startsWith('text/') || textLikeExtensions.includes((fileName || '').split('.').pop().toLowerCase())) {
 		headers.set('Content-Type', 'text/plain; charset=utf-8');
@@ -1634,6 +1709,294 @@ async function handlePublicFileRequest(publicId, request, env) {
 	}
 
 	return new Response(object.body, { headers });
+}
+
+/**
+ * [认证] 处理创建或获取/更新 Memos 分享链接的请求
+ * POST /api/notes/:noteId/share
+ * Body (可选):
+ * {
+ *   "expirationTtl": 3600, // (in seconds) for initial creation or update
+ *   "publicId": "some-uuid" // for updating TTL of an existing link
+ * }
+ */
+async function handleShareNoteRequest(noteId, request, env) {
+	try {
+		const body = await request.json().catch(() => ({}));
+
+		if (body.publicId && body.expirationTtl !== undefined) {
+			const noteShareKey = `note_share:${noteId}`;
+			const publicMemoKey = `public_memo:${body.publicId}`;
+
+			// 为了安全，验证一下 publicId 是否真的属于这个 noteId
+			const storedPublicId = await env.NOTES_KV.get(noteShareKey);
+			if (storedPublicId !== body.publicId) {
+				return jsonResponse({ error: 'Invalid public ID for this note.' }, 400);
+			}
+
+			// 获取旧值以便重新写入
+			const memoData = await env.NOTES_KV.get(publicMemoKey);
+			if (!memoData) {
+				return jsonResponse({ error: 'Share link not found or already expired.' }, 404);
+			}
+
+			const options = {};
+			if (body.expirationTtl > 0) {
+				options.expirationTtl = body.expirationTtl;
+			}
+			// 如果 expirationTtl <= 0，则不设置 options.expirationTtl，KV 会将其视为永不过期
+
+			// 使用新 TTL 重新写入两个键
+			await Promise.all([
+				env.NOTES_KV.put(publicMemoKey, memoData, options),
+				env.NOTES_KV.put(noteShareKey, body.publicId, options)
+			]);
+
+			return jsonResponse({ success: true, message: 'Expiration updated.' });
+
+		} else {
+			// --- 创建或获取新链接 ---
+			let publicId = await env.NOTES_KV.get(`note_share:${noteId}`);
+
+			if (!publicId) {
+				publicId = crypto.randomUUID();
+				// 默认过期时间为 1 小时 (3600 秒)
+				const expirationTtl = (body.expirationTtl !== undefined) ? body.expirationTtl : 3600;
+				const options = {};
+				if (expirationTtl > 0) {
+					options.expirationTtl = expirationTtl;
+				}
+
+				await Promise.all([
+					env.NOTES_KV.put(`public_memo:${publicId}`, JSON.stringify({ noteId: parseInt(noteId, 10) }), options),
+					env.NOTES_KV.put(`note_share:${noteId}`, publicId, options)
+				]);
+			}
+
+			const { protocol, host } = new URL(request.url);
+			const displayUrl = `${protocol}//${host}/share/${publicId}`;
+			const rawUrl = `${protocol}//${host}/api/public/note/raw/${publicId}`;
+
+			return jsonResponse({ displayUrl, rawUrl, publicId }); // 返回 publicId 以便前端更新
+		}
+	} catch (e) {
+		console.error(`Share/Update Note Error (noteId: ${noteId}):`, e.message);
+		return jsonResponse({ error: 'Database or KV error during operation' }, 500);
+	}
+}
+
+/**
+ * 处理取消 Memos 分享的请求
+ * DELETE /api/notes/:noteId/share
+ */
+async function handleUnshareNoteRequest(noteId, env) {
+	try {
+		const publicId = await env.NOTES_KV.get(`note_share:${noteId}`);
+		if (publicId) {
+			await Promise.all([
+				env.NOTES_KV.delete(`public_memo:${publicId}`),
+				env.NOTES_KV.delete(`note_share:${noteId}`)
+			]);
+		}
+		return jsonResponse({ success: true, message: 'Sharing has been revoked.' });
+	} catch (e) {
+		console.error(`Unshare Note Error (noteId: ${noteId}):`, e.message);
+		return jsonResponse({ error: 'Database error while revoking link' }, 500);
+	}
+}
+/**
+ * 处理对单个分享 Memos 内容的请求
+ * GET /api/public/note/:publicId
+ */
+async function handlePublicNoteRequest(publicId, env) {
+	const kvData = await env.NOTES_KV.get(`public_memo:${publicId}`, 'json');
+	if (!kvData || !kvData.noteId) {
+		return jsonResponse({ error: 'Shared note not found or has expired' }, 404);
+	}
+
+	const noteId = kvData.noteId;
+
+	try {
+		const note = await env.DB.prepare("SELECT id, content, updated_at, files FROM notes WHERE id = ?").bind(noteId).first();
+		if (!note) {
+			return jsonResponse({ error: 'Shared note content not found' }, 404);
+		}
+
+		// --- 辅助函数：将任何私有 URL 转换为公开 URL ---
+		const createPublicUrlFor = async (privateUrl) => {
+			const fileMatch = privateUrl.match(/^\/api\/files\/(\d+)\/([a-zA-Z0-9-]+)$/);
+			const imageMatch = privateUrl.match(/^\/api\/images\/([a-zA-Z0-9-]+)$/);
+
+			let kvPayload = null;
+			if (fileMatch) {
+				kvPayload = { noteId: parseInt(fileMatch[1]), fileId: fileMatch[2], fileName: 'media' };
+			} else if (imageMatch) {
+				kvPayload = { standaloneImageId: imageMatch[1], fileName: 'image.png' };
+			}
+
+			if (kvPayload) {
+				const newPublicId = crypto.randomUUID();
+				await env.NOTES_KV.put(`public_file:${newPublicId}`, JSON.stringify(kvPayload));
+				return `/api/public/file/${newPublicId}`;
+			}
+
+			return privateUrl; // 如果不是私有链接，则原样返回
+		};
+
+		// 1. 处理笔记正文 `content` 中的内联图片和视频
+		const urlRegex = /(\/api\/(?:files|images)\/[a-zA-Z0-9\/-]+)/g;
+		const matches = [...note.content.matchAll(urlRegex)];
+		let processedContent = note.content;
+		for (const match of matches) {
+			const privateUrl = match[0];
+			const publicUrl = await createPublicUrlFor(privateUrl);
+			processedContent = processedContent.replace(privateUrl, publicUrl);
+		}
+		note.content = processedContent;
+
+		// 2. 处理 `files` 附件列表
+		let files = [];
+		if (typeof note.files === 'string') {
+			try { files = JSON.parse(note.files); } catch (e) { /* an empty array is fine */ }
+		}
+		for (const file of files) {
+			if (file.id) { // 只处理有 id 的内部文件
+				const privateUrl = `/api/files/${note.id}/${file.id}`;
+				// 复用上面的逻辑，但这次我们知道所有元数据
+				const filePublicId = crypto.randomUUID();
+				await env.NOTES_KV.put(`public_file:${filePublicId}`, JSON.stringify({
+					noteId: note.id,
+					fileId: file.id,
+					fileName: file.name,
+					contentType: file.type
+				}));
+				file.public_url = `/api/public/file/${filePublicId}`;
+			}
+		}
+		note.files = files;
+
+		// 3. 安全处理：移除敏感信息
+		delete note.id;
+
+		// `pics` 和 `videos` 字段的内容已经被处理并包含在 `content` 中，
+		// 为保持 API 响应干净，我们不再需要它们。
+		delete note.pics;
+		delete note.videos;
+
+		return jsonResponse(note);
+
+	} catch (e) {
+		console.error(`Public Note Error (publicId: ${publicId}):`, e.message);
+		return jsonResponse({ error: 'Database Error' }, 500);
+	}
+}
+
+/**
+ * 处理对分享 Memos Raw 内容的请求
+ * GET /api/public/note/raw/:publicId
+ */
+async function handlePublicRawNoteRequest(publicId, env) {
+	// 1. 从 KV 获取 noteId
+	const kvData = await env.NOTES_KV.get(`public_memo:${publicId}`, 'json');
+	if (!kvData || !kvData.noteId) {
+		return new Response('Not Found', { status: 404 });
+	}
+
+	try {
+		// 2. 使用获取到的 noteId 从 D1 查询笔记内容
+		const note = await env.DB.prepare("SELECT content FROM notes WHERE id = ?").bind(kvData.noteId).first();
+		if (!note) {
+			return new Response('Not Found', { status: 404 });
+		}
+		const headers = new Headers({ 'Content-Type': 'text/plain; charset=utf-8' });
+		return new Response(note.content, { headers });
+	} catch (e) {
+		console.error(`Public Raw Note Error (publicId: ${publicId}):`, e.message);
+		return new Response('Server Error', { status: 500 });
+	}
+}
+
+/**
+ * 处理笔记合并请求
+ * POST /api/notes/merge
+ * Body: { sourceNoteId: number, targetNoteId: number, addSeparator: boolean }
+ */
+async function handleMergeNotes(request, env) {
+	const db = env.DB;
+	try {
+		const { sourceNoteId, targetNoteId, addSeparator } = await request.json();
+
+		if (!sourceNoteId || !targetNoteId || sourceNoteId === targetNoteId) {
+			return jsonResponse({ error: 'Invalid source or target note ID.' }, 400);
+		}
+
+		const [noteA, noteB] = await Promise.all([
+			db.prepare("SELECT * FROM notes WHERE id = ?").bind(sourceNoteId).first(),
+			db.prepare("SELECT * FROM notes WHERE id = ?").bind(targetNoteId).first(),
+		]);
+
+		if (!noteA || !noteB) {
+			return jsonResponse({ error: 'One or both notes not found.' }, 404);
+		}
+
+		// --- 核心逻辑：根据时间戳确定新旧笔记 ---
+		let newerNote, olderNote;
+		if (noteA.updated_at >= noteB.updated_at) {
+			newerNote = noteA;
+			olderNote = noteB;
+		} else {
+			newerNote = noteB;
+			olderNote = noteA;
+		}
+
+		// 1. 合并内容：新笔记在前，旧笔记在后
+		// 根据前端传来的 addSeparator 参数决定是否添加分割线
+		const separator = addSeparator ? '\n\n---\n\n' : '\n\n'; // 如果不加，也保留两个换行符
+		const mergedContent = newerNote.content + separator + olderNote.content;
+
+		// 2. 合并文件
+		const newerFiles = JSON.parse(newerNote.files || '[]');
+		const olderFiles = JSON.parse(olderNote.files || '[]');
+		const mergedFiles = JSON.stringify([...newerFiles, ...olderFiles]);
+
+		// 3. 时间戳：取两个笔记中较老的一个
+		const mergedTimestamp = Math.min(noteA.updated_at, noteB.updated_at);
+
+		// --- 数据库与 R2 操作 ---
+
+		const stmt = db.prepare(
+			"UPDATE notes SET content = ?, files = ?, updated_at = ? WHERE id = ?"
+		);
+		await stmt.bind(mergedContent, mergedFiles, mergedTimestamp, newerNote.id).run();
+
+		await processNoteTags(db, newerNote.id, mergedContent);
+
+		await db.prepare("DELETE FROM notes WHERE id = ?").bind(olderNote.id).run();
+
+		if (olderFiles.length > 0) {
+			const r2 = env.NOTES_R2_BUCKET;
+			for (const file of olderFiles) {
+				const oldKey = `${olderNote.id}/${file.id}`;
+				const newKey = `${newerNote.id}/${file.id}`;
+				const object = await r2.get(oldKey);
+				if (object) {
+					await r2.put(newKey, object.body);
+					await r2.delete(oldKey);
+				}
+			}
+		}
+
+		const updatedMergedNote = await db.prepare("SELECT * FROM notes WHERE id = ?").bind(newerNote.id).first();
+		if (typeof updatedMergedNote.files === 'string') {
+			updatedMergedNote.files = JSON.parse(updatedMergedNote.files);
+		}
+
+		return jsonResponse(updatedMergedNote);
+
+	} catch (e) {
+		console.error("Merge Notes Error:", e.message, e.cause);
+		return jsonResponse({ error: 'Database or R2 error during merge', message: e.message }, 500);
+	}
 }
 
 /**

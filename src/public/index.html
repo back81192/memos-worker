@@ -109,6 +109,11 @@
   body[data-theme='dark'] .attachment-link:hover {
 	background-color: #2d3748;
   }
+  body[data-theme='dark'] #share-link-modal-box input[type="text"] {
+	background-color: var(--surface-input-bg, #2d3748);
+	color: var(--text-color);
+	border-color: var(--border-color);
+  }
   body:not(.auth-visible) #app-container {
 	display: block;
   }
@@ -2038,19 +2043,19 @@
 	word-break: break-all;
   }
 
-  .waterfall-more-btn {
-	display: none;
-  }
+  /*.waterfall-more-btn {*/
+	/*display: none;*/
+  /*}*/
 
-  #notes-section.waterfall-mode .waterfall-more-btn {
-	display: flex;
-	margin-left: auto;
-  }
+  /*#notes-section.waterfall-mode .waterfall-more-btn {*/
+	/*display: flex;*/
+	/*margin-left: auto;*/
+  /*}*/
 
-  #notes-section.waterfall-mode .note-view-actions,
-  #notes-section.waterfall-mode .note-actions {
-	display: none;
-  }
+  /*#notes-section.waterfall-mode .note-view-actions,*/
+  /*#notes-section.waterfall-mode .note-actions {*/
+	/*display: none;*/
+  /*}*/
 
   #notes-section.waterfall-mode .attachment-img img {
 	border-radius: 0;
@@ -2873,7 +2878,7 @@
   .share-file-btn {
 	position: absolute;
 	bottom: 4px;
-	right: 4px;
+	right: 40px;
 	z-index: 2;
 	background-color: rgba(0, 0, 0, 0.4);
 	color: white;
@@ -2887,9 +2892,29 @@
 	background-color: rgba(0, 0, 0, 0.6);
   }
 
-  /* 当鼠标悬停在父容器上时显示按钮 */
+  .delete-file-btn {
+	position: absolute;
+	bottom: 4px;
+	right: 4px;
+	z-index: 2;
+	background-color: rgba(229, 62, 62, 0.5);
+	color: white;
+	opacity: 0;
+	visibility: hidden;
+	transform: scale(0.8);
+	transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+  }
+  .delete-file-btn:hover {
+	background-color: rgba(229, 62, 62, 0.8);
+  }
+
   .attachment-img:hover .share-file-btn,
-  .attachment-link:hover .share-file-btn {
+  .attachment-link:hover .share-file-btn,
+  .attachment-item:hover .share-file-btn,
+  .attachment-img:hover .delete-file-btn,
+  .attachment-link:hover .delete-file-btn,
+  .attachment-item:hover .delete-file-btn
+  {
 	opacity: 1;
 	visibility: visible;
 	transform: scale(1);
@@ -2915,6 +2940,67 @@
   }
   .timestamp-toggle-label input {
 	margin: 0;
+  }
+  #toast-notification {
+	position: fixed;
+	top: 20px;
+	left: 50%;
+	transform: translateX(-50%);
+	padding: 10px 20px;
+	border-radius: 8px;
+	color: white;
+	background-color: var(--primary-color);
+	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+	z-index: 9999;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.3s ease, visibility 0.3s ease, top 0.3s ease;
+	font-weight: 500;
+  }
+
+  #toast-notification.visible {
+	opacity: 1;
+	visibility: visible;
+	top: 40px;
+  }
+
+  #toast-notification.toast-error {
+	background-color: var(--danger-color);
+  }
+
+  #toast-notification.toast-info {
+	background-color: var(--accent-color);
+  }
+
+  /* 拖拽时，被拖拽的源笔记的样式 */
+  .note.is-drag-source {
+	opacity: 0.5;
+	border-style: dashed;
+  }
+
+  /* 拖拽时，可作为目标的笔记的样式 */
+  .note.is-drag-target {
+	outline: 2px dashed var(--primary-color);
+	outline-offset: 2px;
+	transform: scale(1.02);
+	box-shadow: 0 8px 20px rgba(var(--primary-color-rgb), 0.3);
+  }
+
+  /* 拖拽时，鼠标下方跟随的“幽灵”元素 */
+  #note-ghost-element {
+	position: fixed;
+	pointer-events: none;
+	z-index: 9999;
+	opacity: 0.75;
+	transform: translate(-50%, -20px);
+	transition: opacity 0.2s;
+	will-change: top, left;
+  }
+
+  /* 当拖拽激活时，给 body 添加的类，用于全局样式控制 */
+  body.note-dragging-active {
+	user-select: none;
+	cursor: grabbing;
   }
 </style>
 <body class='loading' data-theme='dark'>
@@ -3232,6 +3318,9 @@
 	<button class='icon-btn' data-action='archive' title='Archive'>
 		<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L8 13.5l1.41-1.41L11 13.67V10h2v3.67l1.59-1.58L16 13.5l-4 4zM5.12 5l.83-1h12.1l.83 1H5.12z"/></svg>
 	</button>
+	<button class='icon-btn' data-action='share' title='Share'>
+		<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/></svg>
+	</button>
 	<button class='icon-btn btn-danger' data-action='delete' title='Delete Note'>
 		<svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='currentColor'>
 			<path d='M0 0h24v24H0V0z' fill='none' />
@@ -3253,6 +3342,21 @@
 		<div class='custom-modal-actions'>
 			<button id='custom-confirm-cancel-btn' class='btn btn-secondary'>Cancel</button>
 			<button id='custom-confirm-ok-btn' class='btn btn-danger'>Delete</button>
+		</div>
+	</div>
+
+
+	<div id='merge-confirm-box' class='custom-modal-box'>
+		<p id='merge-confirm-message'></p>
+		<div style="margin: 1rem 0; text-align: left; font-size: 0.9rem;">
+			<label style="cursor: pointer; display: flex; align-items: center; justify-content: center;">
+				<input type="checkbox" id="merge-add-separator" checked style="margin-right: 0.5rem;">
+				Add separator line (---) between notes
+			</label>
+		</div>
+		<div class='custom-modal-actions'>
+			<button id='merge-confirm-cancel-btn' class='btn btn-secondary'>Cancel</button>
+			<button id='merge-confirm-ok-btn' class='btn btn-primary'>Merge</button>
 		</div>
 	</div>
 </div>
@@ -3302,9 +3406,19 @@
 				<button class='toolbar-btn' data-md='link' title='Insert Link (Ctrl+K)'>Link</button>
 				<button class='toolbar-btn' data-md='image' title='Insert Image'>Img</button>
 				<button class='toolbar-btn' data-md='blockquote' title='Blockquote'>>_</button>
+				<button class="toolbar-btn" data-md="ulist" title="Unordered List">
+					<svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="currentColor">
+						<path d="M0 0h24v24H0V0z" fill="none"/>
+						<path d="M4 10.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm0-6c-.83 0-1.5.67-1.5 1.5S3.17 7.5 4 7.5 5.5 6.83 5.5 6s-.67-1.5-1.5-1.5zm0 12c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zM7 19h14v-2H7v2zm0-6h14v-2H7v2zm0-8v2h14V5H7z"/>
+					</svg>
+				</button>
 				<button class='toolbar-btn' data-md='code' title='Insert Code Block'>Code</button>
 			</div>
 			<div class='toolbar-right'>
+				<label class="timestamp-toggle-label" id="fs-timestamp-label" title="If unchecked, the note's timestamp will be updated upon saving.">
+					<input type="checkbox" id="fs-update-timestamp-toggle">
+					<span>Keep Time</span>
+				</label>
 				<button id='view-mode-split-btn' class='icon-btn' title='Split View'>
 					<svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='currentColor'>
 						<path d='M0 0h24v24H0V0z' fill='none' />
@@ -3319,6 +3433,7 @@
 						<path d='M22 12c-2.667 4.667 -6 7 -10 7s-7.333 -2.333 -10 -7c2.667 -4.667 6 -7 10 -7s7.333 2.333 10 7' />
 					</svg>
 				</button>
+
 				<button id='fs-save-btn' class='btn btn-primary'>Save</button>
 				<button id='fs-cancel-btn' class='btn btn-secondary'>Cancel</button>
 			</div>
@@ -3381,6 +3496,31 @@
 				<div class='setting-item'>
 					<label for='toggle-date-grouping'>Enable Date Grouping</label>
 					<input type='checkbox' id='toggle-date-grouping' class='toggle-switch'>
+				</div>
+			</div>
+
+
+			<div class='setting-group'>
+				<h4>Feature Visibility</h4>
+				<div class='setting-item'>
+					<label for='toggle-feature-favorites'>Show Favorites</label>
+					<input type='checkbox' id='toggle-feature-favorites' class='toggle-switch'>
+				</div>
+				<div class='setting-item'>
+					<label for='toggle-feature-archive'>Show Archive</label>
+					<input type='checkbox' id='toggle-feature-archive' class='toggle-switch'>
+				</div>
+				<div class='setting-item'>
+					<label for='toggle-feature-pinning'>Enable Pinning</label>
+					<input type='checkbox' id='toggle-feature-pinning' class='toggle-switch'>
+				</div>
+				<div class='setting-item'>
+					<label for='toggle-feature-sharing'>Enable Sharing</label>
+					<input type='checkbox' id='toggle-feature-sharing' class='toggle-switch'>
+				</div>
+				<div class='setting-item'>
+					<label for='toggle-feature-docs'>Show Docs Link</label>
+					<input type='checkbox' id='toggle-feature-docs' class='toggle-switch'>
 				</div>
 			</div>
 
@@ -3481,7 +3621,7 @@
 		</div>
 	</div>
 </div>
-<div id='waterfall-popover-menu' class='popover-menu'>
+<!--<div id='waterfall-popover-menu' class='popover-menu'>
 	<button class='icon-btn' data-action='view' title='View Note'>
 		<svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='currentColor'>
 			<path d='M0 0h24v24H0V0z' fill='none' />
@@ -3495,11 +3635,63 @@
 			<path d='M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z' />
 		</svg>
 	</button>
-</div>
+</div>-->
 
 <div id='heatmap-tooltip'></div>
 <div id='calendar-tooltip'></div>
+<div id="toast-notification"></div>
 
+<!-- Share Link Modal -->
+<div id='share-link-modal-overlay' class='custom-modal-overlay'>
+	<div id='share-link-modal-box' class='custom-modal-box' style="max-width: 600px; text-align: left;">
+		<h3 style="margin-top:0;">Share Memo</h3>
+		<div id="share-link-content">
+			<!-- 加载状态 -->
+			<div id="share-link-loader" style="text-align: center; padding: 2rem 0;">
+				<div class="spinner"></div>
+				<p>Generating link...</p>
+			</div>
+			<!-- 链接内容 -->
+			<div id="share-link-details" style="display: none;">
+				<p>Anyone with these public links can view this memo.</p>
+				<div class="share-link-item" style="margin-bottom: 1rem;">
+					<label style="font-weight: 500;">Display Link</label>
+					<div style="display: flex; gap: 0.5rem;">
+						<input type="text" id="share-display-link-input" readonly style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--bg-color);">
+						<button id="copy-display-link-btn" class="btn">Copy</button>
+					</div>
+				</div>
+				<div class="share-link-item" style="margin-bottom: 1.5rem;">
+					<label style="font-weight: 500;">Raw Content Link</label>
+					<div style="display: flex; gap: 0.5rem;">
+						<input type="text" id="share-raw-link-input" readonly style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--bg-color);">
+						<button id="copy-raw-link-btn" class="btn">Copy</button>
+					</div>
+				</div>
+
+				<div class="share-link-item" style="display: flex; align-items: center; gap: 1rem;">
+					<label for="expiration-select" style="font-weight: 500; flex-shrink: 0;">Expires in:</label>
+					<select id="expiration-select" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--bg-color); color: var(--text-color);">
+						<option value="3600">1 Hour</option>
+						<option value="14400">4 Hour</option>
+						<option value="43200">12 Hours</option>
+						<option value="86400">1 Day</option>
+						<option value="604800">7 Days</option>
+						<option value="0">Never</option>
+						<option disabled>──────────</option>
+						<option value="revoke">Revoke Now (Expire Immediately)</option>
+					</select>
+					<span id="expiration-status" style="font-size: 0.8rem; color: var(--text-secondary); width: 80px; text-align: right;"></span>
+				</div>
+			</div>
+		</div>
+		<div class='custom-modal-actions' style="justify-content: flex-end;">
+			<button id='share-link-close-btn' class='btn btn-secondary'>Close</button>
+		</div>
+	</div>
+</div>
+
+<div id="note-ghost-element"></div>
 <!--	<script src="/script.js" defer></script>-->
 </body>
 </html>
@@ -3897,7 +4089,12 @@
 		showHeatmap: true, imageUploadDestination: 'local', imgurClientId: '',
 		surfaceColor: '#ffffff', surfaceColorDark: '#151f31', surfaceOpacity: 1,
 		backgroundOpacity: 1, backgroundImage: '/bg.jpg', backgroundBlur: 0,
-		waterfallCardWidth: 320, enableDateGrouping: false, telegramProxy: false
+		waterfallCardWidth: 320, enableDateGrouping: false, telegramProxy: false,
+		showFavorites: true,  // 控制收藏夹
+		showArchive: true,      // 控制归档
+		enablePinning: true,    // 控制置顶功能
+		enableSharing: true,    // 控制分享功能
+		showDocs: true          // 控制 Docs 链接
 	}
 	let settings = defaultSettings;
 
@@ -4010,7 +4207,7 @@
 	const favoritesTabBtn = document.getElementById('favorites-tab-btn');
 	const archiveTabBtn = document.getElementById('archive-tab-btn');
 	const waterfallTabBtn = document.getElementById('waterfall-tab-btn');
-	const waterfallPopoverMenu = document.getElementById('waterfall-popover-menu');
+	// const waterfallPopoverMenu = document.getElementById('waterfall-popover-menu');
 	const toggleDateGrouping = document.getElementById('toggle-date-grouping');
 
 	const toggleRightSidebar = document.getElementById('toggle-right-sidebar');
@@ -4077,40 +4274,157 @@
 	let waterfallPopoverHideTimer = null;
 	let activePopoverNoteId = null;
 
+	const shareModal = document.getElementById('share-link-modal-overlay');
+	const closeShareModalBtn = document.getElementById('share-link-close-btn');
+	const copyDisplayLinkBtn = document.getElementById('copy-display-link-btn');
+	const copyRawLinkBtn = document.getElementById('copy-raw-link-btn');
+
+	const expirationSelect = document.getElementById('expiration-select');
+	const expirationStatus = document.getElementById('expiration-status');
+	let currentPublicId = null;
+
+	expirationSelect.addEventListener('change', async () => {
+		const shareModal = document.getElementById('share-link-modal-overlay');
+		const noteId = shareModal.dataset.noteId;
+		const selectedValue = expirationSelect.value;
+
+		if (selectedValue === 'revoke') {
+			const confirmed = await showCustomConfirm('Are you sure you want to revoke the public links immediately? This action cannot be undone.');
+			if (confirmed) {
+				expirationStatus.textContent = 'Revoking...';
+				expirationSelect.disabled = true;
+				try {
+					const response = await fetch(`/api/notes/${noteId}/share`, { method: 'DELETE' });
+					if (!response.ok) {
+						const err = await response.json();
+						throw new Error(err.error || 'Failed to revoke share link.');
+					}
+					closeShareModal();
+					showCustomAlert('Sharing has been successfully revoked.', 'info');
+				} catch (error) {
+					showCustomAlert(`Error: ${error.message}`, 'error');
+					expirationStatus.textContent = 'Error!';
+				} finally {
+					expirationSelect.disabled = false;
+				}
+			} else {
+				expirationSelect.value = "3600";
+			}
+			return;
+		}
+		const newExpirationTtl = parseInt(expirationSelect.value, 10);
+
+		if (!noteId || !currentPublicId) return;
+
+		expirationStatus.textContent = 'Updating...';
+		expirationSelect.disabled = true;
+
+		try {
+			const response = await fetch(`/api/notes/${noteId}/share`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					publicId: currentPublicId,
+					expirationTtl: newExpirationTtl
+				})
+			});
+
+			if (!response.ok) {
+				const err = await response.json();
+				throw new Error(err.error || 'Failed to update expiration.');
+			}
+
+			expirationStatus.textContent = 'Updated!';
+			setTimeout(() => {
+				expirationStatus.textContent = '';
+			}, 2000);
+
+		} catch (error) {
+			expirationStatus.textContent = 'Error!';
+			showCustomAlert(`Error: ${error.message}`, 'error');
+		} finally {
+			expirationSelect.disabled = false;
+		}
+	});
+
+	function closeShareModal() {
+		const shareModal = document.getElementById('share-link-modal-overlay');
+		shareModal.classList.remove('visible');
+		shareModal.querySelector('.custom-modal-box').classList.remove('active');
+		delete shareModal.dataset.noteId;
+		currentPublicId = null;
+	}
+
+	closeShareModalBtn.addEventListener('click', closeShareModal);
+	shareModal.addEventListener('click', (e) => {
+		if (e.target === shareModal) {
+			closeShareModal();
+		}
+	});
+
+	async function copyLink(inputElement, buttonElement) {
+		try {
+			await navigator.clipboard.writeText(inputElement.value);
+			const originalText = buttonElement.textContent;
+			buttonElement.textContent = 'Copied!';
+			setTimeout(() => {
+				buttonElement.textContent = originalText;
+			}, 2000);
+		} catch (err) {
+			console.error('Failed to copy text: ', err);
+			showCustomAlert('Failed to copy link.', 'error');
+		}
+	}
+
+	copyDisplayLinkBtn.addEventListener('click', () => copyLink(document.getElementById('share-display-link-input'), copyDisplayLinkBtn));
+	copyRawLinkBtn.addEventListener('click', () => copyLink(document.getElementById('share-raw-link-input'), copyRawLinkBtn));
 	// --- 显示笔记操作菜单 ---
 	function showNotePopover(targetButton, noteId) {
-		clearTimeout(popoverHoverTimer); // 清除可能存在的隐藏计时器
-		// 如果菜单已经为同一个按钮显示，则不执行任何操作
+		clearTimeout(popoverHoverTimer);
 		if (notePopoverMenu.classList.contains('visible') && activePopoverNoteId === noteId) {
 			return;
 		}
 		activePopoverNoteId = noteId;
 		notePopoverMenu.dataset.noteId = noteId;
+
 		const noteData = allNotesCache.find(n => n.id === parseInt(noteId, 10));
 		const favoriteBtn = notePopoverMenu.querySelector('[data-action="favorite"]');
 		const pinBtn = notePopoverMenu.querySelector('[data-action="pin"]');
 		const archiveBtn = notePopoverMenu.querySelector('[data-action="archive"], [data-action="unarchive"]');
+		const shareBtn = notePopoverMenu.querySelector('[data-action="share"]');
 
+		shareBtn.style.display = settings.enableSharing ? '' : 'none';
 		if (appState.baseMode === 'archive') {
+			// 在归档视图下，只可能显示 "Unarchive"
+			archiveBtn.style.display = settings.showArchive ? '' : 'none'; // 同样要尊重设置
 			archiveBtn.classList.add('unarchive-mode');
 			archiveBtn.title = 'Unarchive';
 			archiveBtn.dataset.action = 'unarchive';
+
+			// 强制隐藏其他不相关的按钮
 			favoriteBtn.style.display = 'none';
 			pinBtn.style.display = 'none';
 		} else {
+			// 在常规视图下（Home, Favorites）
+			archiveBtn.style.display = settings.showArchive ? '' : 'none';
 			archiveBtn.classList.remove('unarchive-mode');
 			archiveBtn.title = 'Archive';
 			archiveBtn.dataset.action = 'archive';
-			favoriteBtn.style.display = '';
-			pinBtn.style.display = '';
 
-			const noteData = allNotesCache.find(n => n.id === parseInt(noteId, 10));
+			// 只有在设置开启时，才显示收藏和置顶按钮
+			favoriteBtn.style.display = settings.showFavorites ? '' : 'none';
+			pinBtn.style.display = settings.enablePinning ? '' : 'none';
+
+			// 如果按钮是可见的，再更新它们的激活状态 (是否已收藏/已置顶)
 			if (noteData) {
-				favoriteBtn.classList.toggle('favorited', noteData.is_favorited);
-				favoriteBtn.title = noteData.is_favorited ? 'Unfavorite' : 'Favorite';
-
-				pinBtn.classList.toggle('pinned', noteData.is_pinned);
-				pinBtn.title = noteData.is_pinned ? 'Unpin' : 'Pin';
+				if (settings.showFavorites) {
+					favoriteBtn.classList.toggle('favorited', noteData.is_favorited);
+					favoriteBtn.title = noteData.is_favorited ? 'Unfavorite' : 'Favorite';
+				}
+				if (settings.enablePinning) {
+					pinBtn.classList.toggle('pinned', noteData.is_pinned);
+					pinBtn.title = noteData.is_pinned ? 'Unpin' : 'Pin';
+				}
 			}
 		}
 
@@ -4221,6 +4535,44 @@
 				}
 				break;
 			}
+			case 'share': {
+				const shareModal = document.getElementById('share-link-modal-overlay');
+				const loader = document.getElementById('share-link-loader');
+				const details = document.getElementById('share-link-details');
+
+				shareModal.dataset.noteId = noteId;
+
+				shareModal.classList.add('visible');
+				shareModal.querySelector('.custom-modal-box').classList.add('active');
+				loader.style.display = 'block';
+				details.style.display = 'none';
+
+				// 将下拉框重置为默认值
+				expirationSelect.value = "3600";
+				expirationStatus.textContent = '';
+
+				try {
+					// 初始创建，使用默认过期时间
+					const response = await fetch(`/api/notes/${noteId}/share`, { method: 'POST' });
+					if (!response.ok) {
+						const err = await response.json();
+						throw new Error(err.error || 'Failed to generate share link.');
+					}
+					const data = await response.json();
+
+					currentPublicId = data.publicId; // 存储 publicId
+
+					document.getElementById('share-display-link-input').value = data.displayUrl;
+					document.getElementById('share-raw-link-input').value = data.rawUrl;
+					loader.style.display = 'none';
+					details.style.display = 'block';
+
+				} catch (error) {
+					showCustomAlert(`Error: ${error.message}`, 'error');
+					closeShareModal();
+				}
+				break;
+			}
 			case 'delete': {
 				if (!noteElement) return;
 				const confirmed = await showCustomConfirm('Are you sure you want to delete this note?');
@@ -4308,13 +4660,13 @@
 		if (isTagDropdownOpen && !tagDropdown.contains(e.target) && e.target !== insertTagBtn) {
 			closeTagDropdown();
 		}
-		if (
-			waterfallPopoverMenu.classList.contains('visible') &&
-			!waterfallPopoverMenu.contains(e.target) &&
-			!e.target.closest('.waterfall-more-btn')
-		) {
-			hideWaterfallPopover();
-		}
+		// if (
+		// 	waterfallPopoverMenu.classList.contains('visible') &&
+		// 	!waterfallPopoverMenu.contains(e.target) &&
+		// 	!e.target.closest('.waterfall-more-btn')
+		// ) {
+		// 	hideWaterfallPopover();
+		// }
 	});
 
 	// 窗口大小改变或滚动时，隐藏浮动窗口，避免错位
@@ -4420,13 +4772,18 @@
 			const gridEl = document.getElementById(`month-${monthKey.replace(/\s/g, '-')}`).querySelector('.attachments-grid');
 			const itemLink = document.createElement('a');
 			itemLink.dataset.noteId = item.noteId;
-			let shareButtonHTML = '';
+			let shareButtonHTML = '', deleteButtonHTML = '';
 			if (item.type === 'file' && item.id) {
 				shareButtonHTML = `
                 <button class="share-file-btn icon-btn" title="Get public link" data-note-id="${item.noteId}" data-file-id="${item.id}">
                     <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/></svg>
                 </button>
             `;
+				deleteButtonHTML = `
+                <button class="delete-file-btn icon-btn" title="Delete file" data-note-id="${item.noteId}" data-file-id="${item.id}">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg>
+                </button>
+                `;
 			}
 			if (item.type === 'image') {
 				itemLink.href = item.url;
@@ -4457,6 +4814,7 @@
                         <div class="size">${formatBytes(item.size)}</div>
                     </div>
                 ${shareButtonHTML}
+                ${deleteButtonHTML}
                 `;
 				gridEl.appendChild(itemLink);
 			}
@@ -4543,6 +4901,64 @@
 				showCustomAlert(`Error: ${error.message}`, 'error');
 				shareBtn.innerHTML = originalIcon;
 				shareBtn.disabled = false;
+			}
+		}
+
+		const deleteBtn = e.target.closest('.delete-file-btn');
+		if (deleteBtn) {
+			e.preventDefault();
+			e.stopPropagation();
+
+			const noteId = deleteBtn.dataset.noteId;
+			const fileId = deleteBtn.dataset.fileId;
+
+			const confirmed = await showCustomConfirm('Are you sure you want to permanently delete this file? This action cannot be undone.');
+			if (!confirmed) return;
+
+			const attachmentItem = deleteBtn.closest('.attachment-item');
+			attachmentItem.style.opacity = '0.5';
+			deleteBtn.disabled = true;
+
+			const formData = new FormData();
+			formData.append('filesToDelete', JSON.stringify([fileId]));
+
+			// 找到对应的笔记内容来填充，以防内容为空
+			const originalNote = allNotesCache.find(n => n.id == noteId);
+			const content = originalNote ? originalNote.content : ''; // 如果在主列表缓存中能找到就用，否则为空
+			formData.append('content', content);
+			formData.append('update_timestamp', 'false');
+
+			try {
+				const response = await fetch(`/api/notes/${noteId}`, {
+					method: 'PUT',
+					body: formData
+				});
+
+				const result = await response.json();
+				if (!response.ok) {
+					const errorData = await response.json();
+					throw new Error(errorData.error || 'Failed to delete file.');
+				}
+
+				if (result.noteDeleted) {
+					// 从 Files 视图中移除所有属于该笔记的附件项
+					attachmentsContent.querySelectorAll(`.attachment-item a[data-note-id="${noteId}"]`).forEach(el => el.closest('.attachment-item').remove());
+					attachmentsState.allData = attachmentsState.allData.filter(item => item.noteId != noteId);
+					allNotesCache = allNotesCache.filter(n => n.id !== parseInt(noteId));
+					showToast('File and empty note removed.', 'info');
+				} else {
+					attachmentItem.remove();
+					attachmentsState.allData = attachmentsState.allData.filter(item => !(item.noteId == noteId && item.id == fileId));
+					if (originalNote) {
+						originalNote.files = originalNote.files.filter(f => f.id !== fileId);
+					}
+					showToast('File deleted successfully.');
+				}
+
+			} catch (error) {
+				showCustomAlert(`Error: ${error.message}`, 'error');
+				attachmentItem.style.opacity = '1';
+				deleteBtn.disabled = false;
 			}
 		}
 	});
@@ -4966,6 +5382,21 @@
 	}
 
 	/**
+	 * 根据设置，应用特性相关 UI 元素的可见性 (主要针对静态元素)
+	 */
+	function applyFeatureVisibilitySettings() {
+		if (!settings) return;
+
+		// 控制右侧边栏的按钮
+		document.getElementById('favorites-tab-btn').style.display = settings.showFavorites ? '' : 'none';
+		document.getElementById('archive-tab-btn').style.display = settings.showArchive ? '' : 'none';
+
+		const docsLink = document.querySelector('.sidebar-buttons-group a[href="/docs"]');
+		if (docsLink) {
+			docsLink.style.display = settings.showDocs ? '' : 'none';
+		}
+	}
+	/**
 	 * 根据当前加载的设置，应用所有UI效果
 	 */
 	async function applySettings() {
@@ -5079,9 +5510,32 @@
 		waterfallWidthValue.textContent = `${settings.waterfallCardWidth}px`;
 		toggleDateGrouping.checked = settings.enableDateGrouping;
 		toggleTelegramProxy.checked = settings.telegramProxy;
+		document.getElementById('toggle-feature-favorites').checked = settings.showFavorites;
+		document.getElementById('toggle-feature-archive').checked = settings.showArchive;
+		document.getElementById('toggle-feature-pinning').checked = settings.enablePinning;
+		document.getElementById('toggle-feature-sharing').checked = settings.enableSharing;
+		document.getElementById('toggle-feature-docs').checked = settings.showDocs;
 	}
 
 	function initializeSettings() {
+		document.getElementById('toggle-feature-favorites').addEventListener('change', (e) => {
+			settings.showFavorites = e.target.checked;
+			applyFeatureVisibilitySettings();
+		});
+		document.getElementById('toggle-feature-archive').addEventListener('change', (e) => {
+			settings.showArchive = e.target.checked;
+			applyFeatureVisibilitySettings();
+		});
+		document.getElementById('toggle-feature-pinning').addEventListener('change', (e) => {
+			settings.enablePinning = e.target.checked;
+		});
+		document.getElementById('toggle-feature-sharing').addEventListener('change', (e) => {
+			settings.enableSharing = e.target.checked;
+		});
+		document.getElementById('toggle-feature-docs').addEventListener('change', (e) => {
+			settings.showDocs = e.target.checked;
+			applyFeatureVisibilitySettings();
+		});
 		surfaceOpacitySlider.addEventListener('input', (e) => {
 			settings.surfaceOpacity = e.target.value
 			applySettings();
@@ -5253,7 +5707,7 @@
 
 
 	// --- 为瀑布流菜单的按钮添加事件委托 ---
-	waterfallPopoverMenu.addEventListener('click', async (e) => {
+/*	waterfallPopoverMenu.addEventListener('click', async (e) => {
 		const actionButton = e.target.closest('.icon-btn');
 		if (!actionButton) return;
 		const action = actionButton.dataset.action;
@@ -5300,8 +5754,9 @@
 
 	waterfallPopoverMenu.addEventListener('mouseleave', () => {
 		hideWaterfallPopover();
-	});
-	function showWaterfallPopover(targetButton, noteId) {
+	});*/
+
+	/*function showWaterfallPopover(targetButton, noteId) {
 		clearTimeout(waterfallPopoverHideTimer);
 		if (waterfallPopoverMenu.classList.contains('visible') && activePopoverNoteId === noteId) {
 			return;
@@ -5316,18 +5771,18 @@
 		activePopoverNoteId = noteId;
 		waterfallPopoverMenu.dataset.noteId = noteId; // 将ID存到菜单上，方便后续操作
 		waterfallPopoverMenu.classList.add('visible');
-	}
+	}*/
 
 	/**
 	 * 隐藏“更多”操作菜单
 	 */
-	function hideWaterfallPopover() {
-		clearTimeout(waterfallPopoverHideTimer);
-		waterfallPopoverHideTimer = setTimeout(() => {
-			waterfallPopoverMenu.classList.remove('visible');
-			activePopoverNoteId = null;
-		}, 200);
-	}
+	// function hideWaterfallPopover() {
+	// 	clearTimeout(waterfallPopoverHideTimer);
+	// 	waterfallPopoverHideTimer = setTimeout(() => {
+	// 		waterfallPopoverMenu.classList.remove('visible');
+	// 		activePopoverNoteId = null;
+	// 	}, 200);
+	// }
 
 	// --- 右侧栏Tab按钮的交互逻辑 ---
 	function updateSidebarTabsUI() {
@@ -5608,6 +6063,16 @@
 		fsEditorTextarea.value = content;
 		fsPreviewPane.innerHTML = postProcessMarkdownHtml(marked.parse(content));
 
+		const timestampLabel = document.getElementById('fs-timestamp-label');
+		const timestampToggle = document.getElementById('fs-update-timestamp-toggle');
+		if (noteId === null) {
+			// 新建笔记时，不更新时间戳没有意义，因此隐藏该选项
+			timestampLabel.style.display = 'none';
+		} else {
+			// 编辑笔记时，显示并默认勾选（不更新时间戳）
+			timestampLabel.style.display = 'flex';
+			timestampToggle.checked = true;
+		}
 		const defaultView = options.defaultViewMode || 'split'; // 默认split
 		setFullscreenViewMode(defaultView);
 		editorContentArea.dataset.viewMode = defaultView;
@@ -5730,6 +6195,57 @@
 			case 'blockquote':
 				applyMarkdown('> ', '');
 				break;
+			case 'ulist': {
+				if (start === end) {
+					applyMarkdown('- ', '');
+					break;
+				}
+				const value = textarea.value;
+				// Find the start of the first line affected by the selection.
+				const firstLineStart = value.lastIndexOf('\n', start - 1) + 1;
+
+				// Find the end of the last line affected by the selection.
+				let lastLineEnd = value.indexOf('\n', end);
+				if (lastLineEnd === -1) {
+					lastLineEnd = value.length;
+				}
+				// If the selection ends exactly on a newline, don't include the next line.
+				if (value.substring(end - 1, end) === '\n') {
+					lastLineEnd = end - 1;
+				}
+
+				const block = value.substring(firstLineStart, lastLineEnd);
+				const lines = block.split('\n');
+				let newBlock = '';
+				let changeInLength = 0;
+
+				// Intelligent Toggle: If every selected line is already a list item, remove the markers.
+				const isTogglingOff = lines.every(line => /^\s*[-*+]\s/.test(line) || line.trim() === '');
+
+				if (isTogglingOff) {
+					newBlock = lines.map(line => {
+						if (line.trim() === '') return line;
+						const transformed = line.replace(/^\s*[-*+]\s/, '');
+						changeInLength -= (line.length - transformed.length);
+						return transformed;
+					}).join('\n');
+				} else {
+					newBlock = lines.map(line => {
+						if (line.trim() === '' || /^\s*[-*+]\s/.test(line)) return line;
+						changeInLength += 2; // for '- '
+						return '- ' + line;
+					}).join('\n');
+				}
+
+				// Perform the replacement using an undoable command.
+				textarea.focus();
+				textarea.setSelectionRange(firstLineStart, lastLineEnd);
+				document.execCommand('insertText', false, newBlock);
+
+				// Restore the user's selection over the modified text.
+				textarea.setSelectionRange(firstLineStart, lastLineEnd + changeInLength);
+				break;
+			}
 			case 'link':
 				const url = prompt('Enter the URL:', 'https://');
 				if (url) applyMarkdown('[', `](${url})`);
@@ -5830,6 +6346,10 @@
 				const formData = new FormData();
 				// 1. 添加从全屏编辑器获取的新内容
 				formData.append('content', content);
+				const timestampToggle = document.getElementById('fs-update-timestamp-toggle');
+				// 如果勾选了 "Keep Time"，则 shouldUpdate 为 false
+				const shouldUpdate = !timestampToggle.checked;
+				formData.append('update_timestamp', shouldUpdate.toString());
 
 				// 2. 从原始的 noteElement 中获取文件状态并添加到 formData
 				// 获取已标记删除的文件
@@ -5935,6 +6455,26 @@
 		return parseFloat((b / Math.pow(k, i)).toFixed(d)) + ' ' + s[i];
 	};
 
+	let toastTimer;
+	function showToast(message, type = 'success', duration = 3000) {
+		const toast = document.getElementById('toast-notification');
+		if (!toast) return;
+
+		clearTimeout(toastTimer); // 如果已有提示，则重置计时器
+
+		toast.textContent = message;
+		toast.className = ''; // 重置类
+		toast.classList.add(`toast-${type}`);
+
+		// 强制触发重绘，以便动画能重新播放
+		void toast.offsetWidth;
+
+		toast.classList.add('visible');
+
+		toastTimer = setTimeout(() => {
+			toast.classList.remove('visible');
+		}, duration);
+	}
 	// 1. 创建一个函数来计算并设置单个笔记的行跨度
 	const setNoteRowSpan = (noteElement) => {
 		const notesContainer = document.getElementById('notes-container');
@@ -5990,6 +6530,156 @@
 		return { relative: absoluteTime, absolute: absoluteTime };
 	}
 
+	// START: 笔记拖拽合并
+	const ghostElement = document.getElementById('note-ghost-element');
+	let dragState = {
+		isMouseDown: false,
+		isDragging: false,
+		sourceNote: null,
+		dragStartX: 0,
+		dragStartY: 0,
+		dragThreshold: 8
+	};
+
+	// 1. 在 mousedown 时，只记录状态，不阻止任何默认行为
+	notesContainer.addEventListener('mousedown', (e) => {
+		if (e.button !== 0 || e.target.closest('button, a, .edit-area, .note-actions')) {
+			return;
+		}
+		const noteElement = e.target.closest('.note');
+		if (!noteElement || noteElement.classList.contains('editing')) return;
+
+		dragState.isMouseDown = true;
+		dragState.sourceNote = noteElement;
+		dragState.dragStartX = e.clientX;
+		dragState.dragStartY = e.clientY;
+	});
+
+	// 2. 在 mousemove 中智能判断并启动拖拽
+	window.addEventListener('mousemove', (e) => {
+		if (!dragState.isMouseDown) return;
+
+		if (dragState.isDragging) {
+			ghostElement.style.left = `${e.clientX}px`;
+			ghostElement.style.top = `${e.clientY}px`;
+
+			document.querySelectorAll('.note.is-drag-target').forEach(el => el.classList.remove('is-drag-target'));
+			const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+			const targetNote = elementBelow ? elementBelow.closest('.note:not(.is-drag-source)') : null;
+			if (targetNote) {
+				targetNote.classList.add('is-drag-target');
+			}
+			return;
+		}
+
+		const dx = Math.abs(e.clientX - dragState.dragStartX);
+		const dy = Math.abs(e.clientY - dragState.dragStartY);
+
+		if (dx > dragState.dragThreshold || dy > dragState.dragThreshold) {
+			const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+			if (!dragState.sourceNote.contains(elementBelow)) {
+				startDrag(e); // 启动拖拽
+			}
+		}
+	});
+
+	// 3. 在 mouseup 时结束所有操作
+	window.addEventListener('mouseup', (e) => {
+		if (!dragState.isMouseDown) return;
+
+		if (dragState.isDragging) {
+			const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+			const targetNote = elementBelow ? elementBelow.closest('.note.is-drag-target') : null;
+
+			if (targetNote) {
+				handleMergeDrop(dragState.sourceNote, targetNote);
+			}
+		}
+		resetDragState();
+	});
+
+	// 启动拖拽的辅助函数
+	function startDrag(e) {
+		if (dragState.isDragging) return;
+
+		e.preventDefault();
+		if (window.getSelection) {
+			window.getSelection().removeAllRanges();
+		}
+
+		dragState.isDragging = true;
+		document.body.classList.add('note-dragging-active');
+		dragState.sourceNote.classList.add('is-drag-source');
+
+		const rect = dragState.sourceNote.getBoundingClientRect();
+		const clonedNote = dragState.sourceNote.cloneNode(true);
+		const actionsContainer = clonedNote.querySelector('.note-actions');
+		if (actionsContainer) {
+			actionsContainer.remove();
+		}
+
+		// 4. 将这个被修改过的克隆体的内部 HTML 设置为“幽灵”的内容
+		ghostElement.innerHTML = clonedNote.innerHTML;
+		ghostElement.className = 'note';
+		ghostElement.style.width = `${rect.width}px`;
+		ghostElement.style.left = `${e.clientX}px`;
+		ghostElement.style.top = `${e.clientY}px`;
+		ghostElement.style.display = 'block';
+	}
+
+	// 重置所有状态
+	function resetDragState() {
+		if (dragState.isDragging) {
+			document.body.classList.remove('note-dragging-active');
+			if (dragState.sourceNote) {
+				dragState.sourceNote.classList.remove('is-drag-source');
+			}
+			document.querySelectorAll('.note.is-drag-target').forEach(el => el.classList.remove('is-drag-target'));
+			ghostElement.style.display = 'none';
+		}
+
+		dragState.isMouseDown = false;
+		dragState.isDragging = false;
+		dragState.sourceNote = null;
+	}
+
+	// 触发合并操作的函数
+	async function handleMergeDrop(sourceElement, targetElement) {
+		const sourceId = sourceElement.dataset.id;
+		const targetId = targetElement.dataset.id;
+
+		const result = await showMergeConfirm(
+			`This will merge Note #${sourceId} and Note #${targetId}. The older note will be merged into the newer one and then deleted.`
+		);
+
+		if (!result.confirmed) return;
+
+		try {
+			const response = await fetch('/api/notes/merge', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					sourceNoteId: parseInt(sourceId),
+					targetNoteId: parseInt(targetId),
+					addSeparator: result.addSeparator
+				})
+			});
+
+			if (!response.ok) {
+				const err = await response.json();
+				throw new Error(err.error || 'Merge failed.');
+			}
+
+			const updatedMergedNote = await response.json();
+
+			showToast('Notes merged successfully!');
+			await refreshNotes();
+
+		} catch (error) {
+			showToast(`Error: ${error.message}`, 'error');
+		}
+	}
+	// END: 笔记拖拽合并
 	/**
 	 * 处理 Textarea 中的 Tab 和 Shift+Tab 缩进/取消缩进功能。
 	 * 此版本使用 document.execCommand 以确保所有操作都是可撤销的 (undoable)。
@@ -6154,10 +6844,44 @@
 		});
 	}
 
+	function showMergeConfirm(message) {
+		return new Promise(resolve => {
+			const mergeBox = document.getElementById('merge-confirm-box');
+			const messageP = document.getElementById('merge-confirm-message');
+			const okBtn = document.getElementById('merge-confirm-ok-btn');
+			const cancelBtn = document.getElementById('merge-confirm-cancel-btn');
+			const separatorCheckbox = document.getElementById('merge-add-separator');
+
+			messageP.textContent = message;
+			customAlertBox.classList.remove('active');
+			customConfirmBox.classList.remove('active');
+			mergeBox.classList.add('active');
+			customModalOverlay.classList.add('visible');
+
+			cancelBtn.focus();
+
+			const onOkClick = () => {
+				hideCustomModal();
+				resolve({
+					confirmed: true,
+					addSeparator: separatorCheckbox.checked
+				});
+			};
+
+			const onCancelClick = () => {
+				hideCustomModal();
+				resolve({ confirmed: false });
+			};
+
+			okBtn.addEventListener('click', onOkClick, { once: true });
+			cancelBtn.addEventListener('click', onCancelClick, { once: true });
+		});
+	}
 	function hideCustomModal() {
 		customModalOverlay.classList.remove('visible');
 		customAlertBox.classList.remove('active');
 		customConfirmBox.classList.remove('active');
+		document.getElementById('merge-confirm-box').classList.remove('active');
 		setTimeout(() => {
 			customAlertMessage.textContent = '';
 			customConfirmMessage.textContent = '';
@@ -6320,13 +7044,13 @@
 			themeColorPopover.classList.remove('visible');
 		}
 		// 检查菜单是否可见，以及点击的目标是否在菜单内部或是否是“更多”按钮
-		if (
-			waterfallPopoverMenu.classList.contains('visible') &&
-			!waterfallPopoverMenu.contains(e.target) &&
-			!e.target.closest('.waterfall-more-btn')
-		) {
-			hideWaterfallPopover();
-		}
+		// if (
+		// 	waterfallPopoverMenu.classList.contains('visible') &&
+		// 	!waterfallPopoverMenu.contains(e.target) &&
+		// 	!e.target.closest('.waterfall-more-btn')
+		// ) {
+		// 	hideWaterfallPopover();
+		// }
 	});
 
 	// --- 返回顶部 ---
@@ -6575,10 +7299,27 @@
                 <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/></svg>
             </button>
         `;
+				const deleteButtonHTML = `
+						<button class="delete-file-btn icon-btn" title="Delete file" data-note-id="${noteId}" data-file-id="${file.id}">
+							<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg>
+						</button>
+					`;
+
 				if (file.type?.startsWith('image/')) {
-					attachmentsHTML += `<div class='attachment-img'><img class='note-image-attachment' loading='lazy' src='${fileUrl}' alt='${file.name}' style='cursor: zoom-in;'></div>`;
+					// 对于图片，将按钮放在一个容器里
+					attachmentsHTML += `<div class='attachment-img'>
+							<img class='note-image-attachment' loading='lazy' src='${fileUrl}' alt='${file.name}' style='cursor: zoom-in;'>
+							${shareButtonHTML}
+							${deleteButtonHTML}
+						</div>`;
 				} else {
-					attachmentsHTML += `<a href='${fileUrl}' class='attachment-link' download='${file.name}'><span class='file-name'>${file.name}</span><span class='file-size'>${formatBytes(file.size)}</span>${shareButtonHTML}</a>`;
+					// 对于普通文件，直接在链接内部添加按钮
+					attachmentsHTML += `<a href='${fileUrl}' class='attachment-link' download='${file.name}'>
+							<span class='file-name'>${file.name}</span>
+							<span class='file-size'>${formatBytes(file.size)}</span>
+							${shareButtonHTML}
+							${deleteButtonHTML}
+						</a>`;
 				}
 			});
 			attachmentsHTML += '</div>';
@@ -6603,9 +7344,9 @@
 															 <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
 													</button>
 											</div>
-											<button class='waterfall-more-btn icon-btn' title='More options'>
-													<svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='currentColor'><path d='M0 0h24v24H0V0z' fill='none'/><path d='M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z'/></svg>
-											</button>
+<!--											<button class='waterfall-more-btn icon-btn' title='More options'>-->
+<!--													<svg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='currentColor'><path d='M0 0h24v24H0V0z' fill='none'/><path d='M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z'/></svg>-->
+<!--											</button>-->
 											<div class='edit-actions edit-mode'>
 													<label class="timestamp-toggle-label" title="If checked, the note's timestamp will not be updated upon saving.">
 															<input type="checkbox" class="update-timestamp-toggle" checked>
@@ -7161,6 +7902,61 @@
 			}
 			return; // 处理完分享点击后，终止后续事件处理
 		}
+
+		const deleteBtn = target.closest('.delete-file-btn');
+		if (deleteBtn) {
+			e.preventDefault();
+			e.stopPropagation();
+
+			const noteId = deleteBtn.dataset.noteId;
+			const fileId = deleteBtn.dataset.fileId;
+
+			const confirmed = await showCustomConfirm('Are you sure you want to permanently delete this file? This action cannot be undone.');
+			if (!confirmed) return;
+
+			const attachmentElement = deleteBtn.closest('.attachment-link, .attachment-img');
+			const noteElement = deleteBtn.closest('.note');
+			attachmentElement.style.opacity = '0.5'; // 提供即时反馈
+			deleteBtn.disabled = true;
+
+			const formData = new FormData();
+			formData.append('filesToDelete', JSON.stringify([fileId]));
+			// 必须发送一个内容，否则PUT请求体可能为空，导致问题
+			const currentNote = allNotesCache.find(n => n.id == noteId);
+			formData.append('content', currentNote.content);
+			formData.append('update_timestamp', 'false');
+
+			try {
+				const response = await fetch(`/api/notes/${noteId}`, {
+					method: 'PUT',
+					body: formData
+				});
+
+				const result = await response.json();
+
+				if (!response.ok) {
+					throw new Error(result.error || 'Failed to delete file.');
+				}
+
+				if (result.noteDeleted) {
+					noteElement.remove(); // 直接删除DOM元素
+					allNotesCache = allNotesCache.filter(n => n.id !== parseInt(noteId));
+					showToast('File and empty note removed.', 'info');
+				} else {
+					attachmentElement.remove();
+					if (currentNote) {
+						currentNote.files = currentNote.files.filter(f => f.id !== fileId);
+					}
+					showToast('File deleted successfully.');
+				}
+
+			} catch (error) {
+				showCustomAlert(`Error: ${error.message}`, 'error');
+				attachmentElement.style.opacity = '1';
+				deleteBtn.disabled = false;
+			}
+			return;
+		}
 		const dateHeader = target.closest('.date-group-header');
 		if (dateHeader) {
 			const group = dateHeader.parentElement;
@@ -7178,12 +7974,12 @@
 		const noteElement = target.closest('.note');
 		if (!noteElement) return;
 		const noteId = noteElement.dataset.id;
-		const moreBtn = target.closest('.waterfall-more-btn');
-		if (moreBtn) {
-			e.stopPropagation(); // 阻止事件冒泡到document的关闭监听器
-			showWaterfallPopover(moreBtn, noteId);
-			return;
-		}
+		// const moreBtn = target.closest('.waterfall-more-btn');
+		// if (moreBtn) {
+		// 	e.stopPropagation(); // 阻止事件冒泡到document的关闭监听器
+		// 	showWaterfallPopover(moreBtn, noteId);
+		// 	return;
+		// }
 		const editBtn = target.closest('.edit');
 		const fullscreenEditBtn = target.closest('.fullscreen-edit');
 
@@ -7332,6 +8128,11 @@
 				const updatedNote = await res.json();
 				const newNoteElement = createNoteElement(updatedNote);
 				noteElement.replaceWith(newNoteElement);
+
+				// 如果当前是瀑布流模式，则需要让 ResizeObserver 开始监视这个新元素
+				if (appState.isWaterfall) {
+					waterfallObserver.observe(newNoteElement);
+				}
 				const noteIndex = allNotesCache.findIndex(n => n.id === parseInt(noteId, 10));
 				if (noteIndex !== -1) {
 					allNotesCache[noteIndex] = updatedNote;
@@ -7376,20 +8177,20 @@
 			showNotePopover(moreBtn, noteId);
 			return;
 		}
-		const waterfallMoreBtn = e.target.closest('.waterfall-more-btn');
-		if (waterfallMoreBtn) {
-			showWaterfallPopover(waterfallMoreBtn, noteId);
-			return;
-		}
+		// const waterfallMoreBtn = e.target.closest('.waterfall-more-btn');
+		// if (waterfallMoreBtn) {
+		// 	showWaterfallPopover(waterfallMoreBtn, noteId);
+		// 	return;
+		// }
 	});
 
 	notesContainer.addEventListener('mouseout', e => {
 		if (e.target.closest('.more-actions-btn')) {
 			hideNotePopover();
 		}
-		if (e.target.closest('.waterfall-more-btn')) {
-			hideWaterfallPopover();
-		}
+		// if (e.target.closest('.waterfall-more-btn')) {
+		// 	hideWaterfallPopover();
+		// }
 	});
 
 	function createFileTag(name, id = null) {
